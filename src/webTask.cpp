@@ -20,7 +20,8 @@ public:
   virtual ~CaptiveRequestHandler() {}
 
   bool canHandle(AsyncWebServerRequest *request) override {
-    if (request->url() == "/" || request->url() == "/data") {
+    if (request->url() == "/" || request->url() == "/data" ||
+        request->url() == "/history") {
       return false;
     }
     return true;
@@ -51,8 +52,6 @@ void webTask(void *pvParameters) {
     Serial.println("[WebTask] mDNS started: http://beitub.local");
   }
 
-  // 1. SPECIFIC ROUTES FIRST: Live Data API Endpoint
-  // 1. Live Data API Endpoint (Updated to include debug fields)
   server.on("/data", HTTP_GET, [](AsyncWebServerRequest *req) {
     DeviceState localState;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(100))) {
@@ -87,8 +86,6 @@ void webTask(void *pvParameters) {
     req->send(200, "application/json", json);
   });
 
-  // 2. NEW ROUTE: Receive slider configuration adjustments
-  // Example call: /config?override=true&aqi=7.5
   server.on("/config", HTTP_POST, [](AsyncWebServerRequest *req) {
     bool nextOverride = false;
     float nextAqi = 1.0f;
@@ -110,10 +107,63 @@ void webTask(void *pvParameters) {
     }
   });
 
-  // 3. CATCH-ALL ROUTE: Serve static dashboard files from LittleFS
+  server.on("/api/set-time", HTTP_POST, [](AsyncWebServerRequest *req) {
+    if (req->hasParam("epoch")) {
+      unsigned long phoneTime = req->getParam("epoch")->value().toInt();
+
+      if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(100))) {
+        historyLogs.timeOffset = phoneTime - (millis() / 1000);
+        historyLogs.isTimeSynced = true;
+        xSemaphoreGive(stateMutex);
+
+        Serial.println(
+            "[WebTask] Timeline calibrated via dashboard attachment.");
+        req->send(200, "text/plain", "Time Synced");
+      } else {
+        req->send(500, "text/plain", "Mutex Busy");
+      }
+    } else {
+      req->send(400, "text/plain", "Missing epoch token");
+    }
+  });
+
+  server.on("/history", HTTP_GET, [](AsyncWebServerRequest *req) {
+    String json = "[";
+
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(200))) {
+      int count = historyLogs.count;
+      int head = historyLogs.head;
+      int startIndex = (count == MAX_LOG_ENTRIES) ? head : 0;
+
+      for (int i = 0; i < count; i++) {
+        int index = (startIndex + i) % MAX_LOG_ENTRIES;
+        LogEntry entry = historyLogs.buffer[index];
+
+        // Apply retroactive calculations for true unix timestamps
+        unsigned long retroActiveTime =
+            entry.uptimeSeconds + historyLogs.timeOffset;
+
+        json += "{";
+        json += "\"t\":" + String(retroActiveTime) + ",";
+        json += "\"aqi\":" + String(entry.aqi) + ",";
+        json += "\"pm25\":" + String(entry.pm2_5, 2) + ",";
+        json += "\"pm10\":" + String(entry.pm10, 2) + ",";
+        json += "\"co2\":" + String(entry.co2, 2) + ",";
+        json += "\"voc\":" + String(entry.voc_indx, 2);
+        json += "}";
+
+        if (i < count - 1)
+          json += ",";
+      }
+      xSemaphoreGive(stateMutex);
+    }
+
+    json += "]";
+    req->send(200, "application/json", json);
+  });
+
   server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
 
-  // 3. Captive Portal & 404 Handlers remain at the very bottom
   server.addHandler(new CaptiveRequestHandler()).setFilter(ON_AP_FILTER);
 
   server.onNotFound([](AsyncWebServerRequest *req) {

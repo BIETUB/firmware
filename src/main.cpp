@@ -1,5 +1,6 @@
 #include "actuatorTasks.h"
 #include "aqiEngineTask.h"
+#include "loggerTask.h"
 #include "monitorTask.h"
 #include "sensorTask.h"
 #include "sharedState.h"
@@ -8,6 +9,7 @@
 #include <Wire.h>
 
 DeviceState state;
+HistoryData historyLogs;
 SemaphoreHandle_t stateMutex;
 
 void setup() {
@@ -26,6 +28,7 @@ void setup() {
   xTaskCreate(ledTask, "LEDTask", 2048, NULL, 1, NULL);
   xTaskCreate(motorTask, "MotorTask", 2048, NULL, 1, NULL);
   xTaskCreate(diffuserTask, "DiffuserTask", 2048, NULL, 1, NULL);
+  xTaskCreate(loggerTask, "LoggerTask", 2048, NULL, 1, NULL);
 
   Serial.println("Tasks launched successfully!");
 }

@@ -19,7 +19,15 @@
 
         h1 {
             color: #38bdf8;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-indicator {
             margin-bottom: 2rem;
+            color: #94a3b8;
+            font-size: 0.95rem;
+            display: flex;
+            align-items: center;
         }
 
         .grid {
@@ -44,6 +52,28 @@
 
         .card:hover {
             transform: translateY(-5px);
+        }
+
+        .chart-card {
+            width: 100%;
+            max-width: 800px;
+            box-sizing: border-box;
+            margin-bottom: 2rem;
+            text-align: left;
+        }
+
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 220px;
+            margin-top: 1rem;
+        }
+
+        canvas {
+            width: 100% !important;
+            height: 100% !important;
+            background: rgba(15, 23, 42, 0.5);
+            border-radius: 8px;
         }
 
         .label {
@@ -71,7 +101,7 @@
             height: 10px;
             border-radius: 50%;
             background: #22c55e;
-            margin-right: 6px;
+            margin-right: 8px;
             animation: pulse 1.5s infinite;
         }
 
@@ -111,7 +141,6 @@
             color: #10b981;
         }
 
-        /* Debug Section Styling */
         .debug-panel {
             background: rgba(51, 65, 85, 0.5);
             border: 2px dashed #475569;
@@ -163,7 +192,6 @@
             text-align: right;
         }
 
-        /* Simple Toggle Switch styling */
         .switch {
             position: relative;
             display: inline-block;
@@ -214,6 +242,7 @@
             width: 100%;
             max-width: 800px;
             margin-bottom: 1.5rem;
+            box-sizing: border-box;
         }
 
         .progress-container {
@@ -242,26 +271,23 @@
 
 <body>
     <h1>Air Quality Dashboard</h1>
-    <p><span class="dot"></span>Live Sensor Data</p>
+    <div class="status-indicator"><span class="dot"></span>Live System Monitoring</div>
 
     <div id="warmupCard" class="card warmup-card">
-        <div class="label">Sensor Warmup</div>
-
+        <div class="label" style="color:#38bdf8;">Sensor Stabilization Period</div>
         <div class="progress-container">
             <div id="warmupBar" class="progress-bar"></div>
         </div>
-
         <div class="progress-text">
-            Initializing sensors...
-            <span id="warmupPercent">0%</span>
+            Initializing architecture... <span id="warmupPercent">0%</span>
         </div>
     </div>
 
     <div class="grid">
         <div class="card">
-            <div class="label">AQI</div>
+            <div class="label">AQI (Calculated)</div>
             <div class="value c-pm" id="aqi">--</div>
-            <div class="unit">Worst Pollutant: <span id="worst">--</span></div>
+            <div class="unit">Driving Vector: <span id="worst" style="color:#e2e8f0;">--</span></div>
         </div>
         <div class="card">
             <div class="label">PM1.0</div>
@@ -284,19 +310,19 @@
             <div class="unit">µg/m³</div>
         </div>
         <div class="card">
-            <div class="label">CO2</div>
+            <div class="label">CO2 Level</div>
             <div class="value c-co2" id="co2">--</div>
             <div class="unit">ppm</div>
         </div>
         <div class="card">
             <div class="label">VOC Index</div>
             <div class="value c-voc" id="voc">--</div>
-            <div class="unit">idx</div>
+            <div class="unit">points</div>
         </div>
         <div class="card">
             <div class="label">NOx Index</div>
             <div class="value c-nox" id="nox">--</div>
-            <div class="unit">idx</div>
+            <div class="unit">points</div>
         </div>
         <div class="card">
             <div class="label">Temperature</div>
@@ -310,6 +336,13 @@
         </div>
     </div>
 
+    <div class="card chart-card">
+        <div class="label">AQI Exposure Timeline (RAM Buffer)</div>
+        <div class="canvas-container">
+            <canvas id="historyChart"></canvas>
+        </div>
+    </div>
+
     <div class="debug-panel">
         <div class="debug-title">🛠️ Actuator Tester (Debug Override)</div>
         <div class="debug-row">
@@ -320,7 +353,7 @@
             </label>
         </div>
         <div class="slider-container">
-            <span>Target AQI:</span>
+            <span>Target AQI Expression:</span>
             <input type="range" id="debugSlider" min="1.0" max="10.0" step="0.1" value="1.0"
                 oninput="updateSliderLabel(this.value)" onchange="sendConfig()" disabled>
             <span class="slider-val" id="sliderValDisplay">1.0</span>
@@ -329,29 +362,42 @@
 
     <script>
         let isUserInteracting = false;
-
-        const TOTAL_WARMUP_TIME = 120; // seconds
+        const TOTAL_WARMUP_TIME = 120; // Matches your 2-minute metric constraint
 
         function updateSliderLabel(val) {
             document.getElementById('sliderValDisplay').textContent = parseFloat(val).toFixed(1);
-            isUserInteracting = true; // Stop incoming network updates from snapping slider while dragging
+            isUserInteracting = true;
+        }
+
+        // =========================================================================
+        // SILENT TIMESTAMP INJECTION (Option 1 Execution)
+        // =========================================================================
+        async function syncTime() {
+            try {
+                const epochSeconds = Math.floor(Date.now() / 1000);
+                // POST request safely routes parameters matching webTask signature
+                await fetch(`/api/set-time?epoch=${epochSeconds}`, { method: 'POST' });
+                console.log("Real-world clock reference injected successfully.");
+            } catch (e) {
+                console.error('Clock sync connection error:', e);
+            }
         }
 
         async function sendConfig() {
             const isOverridden = document.getElementById('overrideToggle').checked;
             const targetAqiVal = document.getElementById('debugSlider').value;
-
-            // Enable or disable slider styling dynamically
             document.getElementById('debugSlider').disabled = !isOverridden;
 
             try {
                 await fetch(`/config?override=${isOverridden}&aqi=${targetAqiVal}`, { method: 'POST' });
             } catch (e) { console.error('Failed to send configuration', e); }
 
-            // Let polling resume control after a brief delay
             setTimeout(() => { isUserInteracting = false; }, 500);
         }
 
+        // =========================================================================
+        // LIVE METRIC DATA FETCH
+        // =========================================================================
         async function fetchData() {
             try {
                 const r = await fetch('/data');
@@ -359,24 +405,25 @@
 
                 const warmupCard = document.getElementById('warmupCard');
                 const warmupBar = document.getElementById('warmupBar');
+                const warmupPercent = document.getElementById('warmupPercent');
 
                 if (d.isWarmingUp) {
                     warmupCard.style.display = 'block';
-
-                    const progress =
-                        ((TOTAL_WARMUP_TIME - d.warmupTime) / TOTAL_WARMUP_TIME) * 100;
-
-                    warmupBar.style.width =
-                        Math.max(0, Math.min(100, progress)) + '%';
+                    const progress = ((TOTAL_WARMUP_TIME - d.warmupTime) / TOTAL_WARMUP_TIME) * 100;
+                    const cleanPct = Math.max(0, Math.min(100, Math.round(progress)));
+                    warmupBar.style.width = cleanPct + '%';
+                    warmupPercent.textContent = cleanPct + '%';
                 } else {
                     warmupCard.style.display = 'none';
                 }
 
                 const updateVal = (id, val, isIndex) => {
+                    const elem = document.getElementById(id);
+                    if (!elem) return;
                     if (isIndex && val > 3000) {
-                        document.getElementById(id).textContent = "Init..";
+                        elem.textContent = "Init..";
                     } else {
-                        document.getElementById(id).textContent = val.toFixed(1);
+                        elem.textContent = val.toFixed(1);
                     }
                 };
 
@@ -391,22 +438,138 @@
                 updateVal('nox', d.nox, true);
                 updateVal('temp', d.temp, false);
                 updateVal('hum', d.hum, false);
-                document.getElementById('display').textContent = d.aqi;
 
-
-                // Keep UI synced with the internal hardware state if user isn't moving elements
                 if (!isUserInteracting) {
                     document.getElementById('overrideToggle').checked = d.debugOverride;
                     document.getElementById('debugSlider').disabled = !d.debugOverride;
                     document.getElementById('debugSlider').value = d.debugAQI;
                     document.getElementById('sliderValDisplay').textContent = d.debugAQI.toFixed(1);
                 }
-
-            } catch (e) { console.warn('fetch failed', e); }
+            } catch (e) { console.warn('Live poll connection error', e); }
         }
 
+        // =========================================================================
+        // NATIVE VANILLA GRAPH ENGINE (Offline Safe)
+        // =========================================================================
+        async function fetchAndDrawHistory() {
+            try {
+                const r = await fetch('/history');
+                const data = await r.json();
+
+                const canvas = document.getElementById('historyChart');
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+
+                // Device pixel ratio calibration for crisp displays
+                const width = canvas.clientWidth;
+                const height = canvas.clientHeight;
+                if (canvas.width !== width || canvas.height !== height) {
+                    canvas.width = width;
+                    canvas.height = height;
+                }
+
+                ctx.clearRect(0, 0, width, height);
+                if (data.length === 0) {
+                    ctx.fillStyle = '#64748b';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('Awaiting structural trend data history collection...', width / 2, height / 2);
+                    return;
+                }
+
+                // Layout boundaries
+                const paddingLeft = 40;
+                const paddingRight = 20;
+                const paddingTop = 20;
+                const paddingBottom = 30;
+                const graphWidth = width - paddingLeft - paddingRight;
+                const graphHeight = height - paddingTop - paddingBottom;
+
+                // Calculate scales
+                const aqiValues = data.map(d => d.aqi);
+                const maxAqi = Math.max(10, Math.max(...aqiValues) * 1.2);
+                const minAqi = 0;
+
+                // Draw Horizontal Gridlines & Y Axis Labels
+                ctx.strokeStyle = 'rgba(71, 85, 105, 0.3)';
+                ctx.lineWidth = 1;
+                ctx.fillStyle = '#64748b';
+                ctx.font = '10px sans-serif';
+                ctx.textAlign = 'right';
+
+                const gridLines = 4;
+                for (let i = 0; i <= gridLines; i++) {
+                    const ratio = i / gridLines;
+                    const y = paddingTop + graphHeight * (1 - ratio);
+                    const val = minAqi + (maxAqi - minAqi) * ratio;
+
+                    ctx.beginPath();
+                    ctx.moveTo(paddingLeft, y);
+                    ctx.lineTo(width - paddingRight, y);
+                    ctx.stroke();
+                    ctx.fillText(val.toFixed(0), paddingLeft - 8, y + 4);
+                }
+
+                // Build trend path vector
+                ctx.beginPath();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#f43f5e'; // Deep pink trending color matching AQI block
+
+                for (let i = 0; i < data.length; i++) {
+                    const xRatio = data.length > 1 ? i / (data.length - 1) : 0.5;
+                    const yRatio = (data[i].aqi - minAqi) / (maxAqi - minAqi);
+
+                    const x = paddingLeft + (xRatio * graphWidth);
+                    const y = paddingTop + graphHeight * (1 - yRatio);
+
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+
+                // Build subtle fill area underneath line path
+                if (data.length > 0) {
+                    ctx.lineTo(paddingLeft + graphWidth, paddingTop + graphHeight);
+                    ctx.lineTo(paddingLeft, paddingTop + graphHeight);
+                    ctx.fillStyle = 'rgba(244, 63, 94, 0.08)';
+                    ctx.fill();
+                }
+
+                // Render Time Labels on X Axis (Handles backdated real-time vs raw uptime)
+                ctx.fillStyle = '#64748b';
+                ctx.textAlign = 'center';
+
+                if (data.length > 0) {
+                    // Check if time has been synced (Uptime references look like small numbers, epochs look like >10000000)
+                    const formatTime = (ts) => {
+                        if (ts < 10000000) return ts + 's'; // Displays simple uptime trace
+                        const date = new Date(ts * 1000);
+                        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                    };
+
+                    // Leftmost mark
+                    ctx.fillText(formatTime(data[0].t), paddingLeft, height - paddingBottom + 18);
+                    // Rightmost mark
+                    if (data.length > 1) {
+                        ctx.fillText(formatTime(data[data.length - 1].t), width - paddingRight, height - paddingBottom + 18);
+                    }
+                }
+            } catch (e) { console.error('History canvas engine error', e); }
+        }
+
+        // =========================================================================
+        // INITIALIZATION AND CYCLIC POLLING
+        // =========================================================================
+        // 1. Immediately inject the phone browser context's current real time
+        syncTime();
+
+        // 2. Load immediate dataset reads
         fetchData();
-        setInterval(fetchData, 2000);
+        setTimeout(fetchAndDrawHistory, 300);
+
+        // 3. Keep standard looping frequencies separated to avoid overloading core buses
+        setInterval(fetchData, 2000);            // Fast data card loops
+        setInterval(fetchAndDrawHistory, 10000); // Trend chart updates matching the tracking block
     </script>
 </body>
 

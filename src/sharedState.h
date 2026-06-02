@@ -3,6 +3,25 @@
 
 enum operatingMode { MODE_LEVEL, MODE_TIME_BASED };
 
+const int MAX_LOG_ENTRIES = 60;
+
+struct LogEntry {
+  unsigned long uptimeSeconds;
+  int aqi;
+  int pm2_5;
+  int pm10;
+  int co2;
+  int voc_indx;
+};
+
+struct HistoryData {
+  bool isTimeSynced = false;
+  unsigned long timeOffset = 0;
+  LogEntry buffer[MAX_LOG_ENTRIES];
+  int head = 0;
+  int count = 0;
+};
+
 struct DeviceState {
   float pm1;
   float pm2_5;
@@ -24,7 +43,11 @@ struct DeviceState {
 
   bool isWarmingUp = true;
   int warmupSeconds = 120;
+
+  bool isTimeSynced = false;
+  unsigned long timeOffset = 0;
 };
 
 extern DeviceState state;
+extern HistoryData historyLogs;
 extern SemaphoreHandle_t stateMutex;
