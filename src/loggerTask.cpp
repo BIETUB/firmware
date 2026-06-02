@@ -16,7 +16,7 @@ void loggerTask(void *pvParameters) {
 
         LogEntry newEntry;
         newEntry.uptimeSeconds = millis() / 1000;
-        newEntry.aqi = round(state.customAQIFloat);
+        newEntry.aqi = state.customAQIFloat;
         newEntry.pm2_5 = state.pm2_5;
         newEntry.pm10 = state.pm10;
         newEntry.co2 = state.co2;
