@@ -3,7 +3,7 @@
 #include <Arduino.h>
 
 const unsigned long LOG_INTERVAL_MS =
-    10000; // Change to 300000 (5 mins) for long term trends later
+    300000; // Change to 300000 (5 mins) for long term trends later
 
 void loggerTask(void *pvParameters) {
   for (;;) {
