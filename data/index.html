@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Air Quality Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #0f172a;
+            color: #e2e8f0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 2rem;
+            margin: 0;
+        }
+
+        h1 {
+            color: #38bdf8;
+            margin-bottom: 2rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 2rem;
+        }
+
+        .card {
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: transform 0.2s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+        }
+
+        .label {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.5rem;
+        }
+
+        .value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            margin-bottom: 0.25rem;
+        }
+
+        .unit {
+            font-size: 1rem;
+            color: #64748b;
+        }
+
+        .dot {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #22c55e;
+            margin-right: 6px;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: 0.3
+            }
+        }
+
+        .c-pm {
+            color: #f43f5e;
+        }
+
+        .c-temp {
+            color: #f97316;
+        }
+
+        .c-hum {
+            color: #0ea5e9;
+        }
+
+        .c-voc {
+            color: #8b5cf6;
+        }
+
+        .c-nox {
+            color: #d946ef;
+        }
+
+        .c-co2 {
+            color: #10b981;
+        }
+
+        /* Debug Section Styling */
+        .debug-panel {
+            background: rgba(51, 65, 85, 0.5);
+            border: 2px dashed #475569;
+            border-radius: 16px;
+            padding: 1.5rem;
+            width: 100%;
+            max-width: 800px;
+            box-sizing: border-box;
+        }
+
+        .debug-title {
+            color: #e2e8f0;
+            font-weight: bold;
+            font-size: 1.2rem;
+            margin-top: 0;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .debug-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            width: 100%;
+        }
+
+        .slider-container input {
+            flex-grow: 1;
+            accent-color: #38bdf8;
+            cursor: pointer;
+        }
+
+        .slider-val {
+            font-size: 1.5rem;
+            font-weight: bold;
+            color: #38bdf8;
+            min-width: 3rem;
+            text-align: right;
+        }
+
+        /* Simple Toggle Switch styling */
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 26px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider-toggle {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #475569;
+            transition: .3s;
+            border-radius: 34px;
+        }
+
+        .slider-toggle:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .3s;
+            border-radius: 50%;
+        }
+
+        input:checked+.slider-toggle {
+            background-color: #22c55e;
+        }
+
+        input:checked+.slider-toggle:before {
+            transform: translateX(24px);
+        }
+
+        .warmup-card {
+            display: none;
+            width: 100%;
+            max-width: 800px;
+            margin-bottom: 1.5rem;
+        }
+
+        .progress-container {
+            width: 100%;
+            height: 24px;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 12px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .progress-bar {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #38bdf8, #22c55e);
+            transition: width 0.5s ease;
+        }
+
+        .progress-text {
+            margin-top: 0.75rem;
+            color: #94a3b8;
+            font-size: 0.95rem;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Air Quality Dashboard</h1>
+    <p><span class="dot"></span>Live Sensor Data</p>
+
+    <div id="warmupCard" class="card warmup-card">
+        <div class="label">Sensor Warmup</div>
+
+        <div class="progress-container">
+            <div id="warmupBar" class="progress-bar"></div>
+        </div>
+
+        <div class="progress-text">
+            Initializing sensors...
+            <span id="warmupPercent">0%</span>
+        </div>
+    </div>
+
+    <div class="grid">
+        <div class="card">
+            <div class="label">AQI</div>
+            <div class="value c-pm" id="aqi">--</div>
+            <div class="unit">Worst Pollutant: <span id="worst">--</span></div>
+        </div>
+        <div class="card">
+            <div class="label">PM1.0</div>
+            <div class="value c-pm" id="pm1">--</div>
+            <div class="unit">µg/m³</div>
+        </div>
+        <div class="card">
+            <div class="label">PM2.5</div>
+            <div class="value c-pm" id="pm25">--</div>
+            <div class="unit">µg/m³</div>
+        </div>
+        <div class="card">
+            <div class="label">PM4.0</div>
+            <div class="value c-pm" id="pm4">--</div>
+            <div class="unit">µg/m³</div>
+        </div>
+        <div class="card">
+            <div class="label">PM10</div>
+            <div class="value c-pm" id="pm10">--</div>
+            <div class="unit">µg/m³</div>
+        </div>
+        <div class="card">
+            <div class="label">CO2</div>
+            <div class="value c-co2" id="co2">--</div>
+            <div class="unit">ppm</div>
+        </div>
+        <div class="card">
+            <div class="label">VOC Index</div>
+            <div class="value c-voc" id="voc">--</div>
+            <div class="unit">idx</div>
+        </div>
+        <div class="card">
+            <div class="label">NOx Index</div>
+            <div class="value c-nox" id="nox">--</div>
+            <div class="unit">idx</div>
+        </div>
+        <div class="card">
+            <div class="label">Temperature</div>
+            <div class="value c-temp" id="temp">--</div>
+            <div class="unit">°C</div>
+        </div>
+        <div class="card">
+            <div class="label">Humidity</div>
+            <div class="value c-hum" id="hum">--</div>
+            <div class="unit">% RH</div>
+        </div>
+    </div>
+
+    <div class="debug-panel">
+        <div class="debug-title">🛠️ Actuator Tester (Debug Override)</div>
+        <div class="debug-row">
+            <span>Enable Manual Test Mode:</span>
+            <label class="switch">
+                <input type="checkbox" id="overrideToggle" onchange="sendConfig()">
+                <span class="slider-toggle"></span>
+            </label>
+        </div>
+        <div class="slider-container">
+            <span>Target AQI:</span>
+            <input type="range" id="debugSlider" min="1.0" max="10.0" step="0.1" value="1.0"
+                oninput="updateSliderLabel(this.value)" onchange="sendConfig()" disabled>
+            <span class="slider-val" id="sliderValDisplay">1.0</span>
+        </div>
+    </div>
+
+    <script>
+        let isUserInteracting = false;
+
+        const TOTAL_WARMUP_TIME = 120; // seconds
+
+        function updateSliderLabel(val) {
+            document.getElementById('sliderValDisplay').textContent = parseFloat(val).toFixed(1);
+            isUserInteracting = true; // Stop incoming network updates from snapping slider while dragging
+        }
+
+        async function sendConfig() {
+            const isOverridden = document.getElementById('overrideToggle').checked;
+            const targetAqiVal = document.getElementById('debugSlider').value;
+
+            // Enable or disable slider styling dynamically
+            document.getElementById('debugSlider').disabled = !isOverridden;
+
+            try {
+                await fetch(`/config?override=${isOverridden}&aqi=${targetAqiVal}`, { method: 'POST' });
+            } catch (e) { console.error('Failed to send configuration', e); }
+
+            // Let polling resume control after a brief delay
+            setTimeout(() => { isUserInteracting = false; }, 500);
+        }
+
+        async function fetchData() {
+            try {
+                const r = await fetch('/data');
+                const d = await r.json();
+
+                const warmupCard = document.getElementById('warmupCard');
+                const warmupBar = document.getElementById('warmupBar');
+
+                if (d.isWarmingUp) {
+                    warmupCard.style.display = 'block';
+
+                    const progress =
+                        ((TOTAL_WARMUP_TIME - d.warmupTime) / TOTAL_WARMUP_TIME) * 100;
+
+                    warmupBar.style.width =
+                        Math.max(0, Math.min(100, progress)) + '%';
+                } else {
+                    warmupCard.style.display = 'none';
+                }
+
+                const updateVal = (id, val, isIndex) => {
+                    if (isIndex && val > 3000) {
+                        document.getElementById(id).textContent = "Init..";
+                    } else {
+                        document.getElementById(id).textContent = val.toFixed(1);
+                    }
+                };
+
+                document.getElementById('worst').textContent = d.worst;
+                updateVal('aqi', d.aqi, true);
+                updateVal('pm1', d.pm1, false);
+                updateVal('pm25', d.pm25, false);
+                updateVal('pm4', d.pm4, false);
+                updateVal('pm10', d.pm10, false);
+                document.getElementById('co2').textContent = d.co2;
+                updateVal('voc', d.voc, true);
+                updateVal('nox', d.nox, true);
+                updateVal('temp', d.temp, false);
+                updateVal('hum', d.hum, false);
+                document.getElementById('display').textContent = d.aqi;
+
+
+                // Keep UI synced with the internal hardware state if user isn't moving elements
+                if (!isUserInteracting) {
+                    document.getElementById('overrideToggle').checked = d.debugOverride;
+                    document.getElementById('debugSlider').disabled = !d.debugOverride;
+                    document.getElementById('debugSlider').value = d.debugAQI;
+                    document.getElementById('sliderValDisplay').textContent = d.debugAQI.toFixed(1);
+                }
+
+            } catch (e) { console.warn('fetch failed', e); }
+        }
+
+        fetchData();
+        setInterval(fetchData, 2000);
+    </script>
+</body>
+
+</html>
