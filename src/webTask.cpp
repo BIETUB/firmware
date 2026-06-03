@@ -21,7 +21,7 @@ public:
 
   bool canHandle(AsyncWebServerRequest *request) override {
     if (request->url() == "/" || request->url() == "/data" ||
-        request->url() == "/history") {
+        request->url() == "/history" || request->url().startsWith("/api/")) {
       return false;
     }
     return true;
@@ -52,6 +52,9 @@ void webTask(void *pvParameters) {
     Serial.println("[WebTask] mDNS started: http://beitub.local");
   }
 
+  // =========================================================================
+  // /data — Live metric data (mode-aware)
+  // =========================================================================
   server.on("/data", HTTP_GET, [](AsyncWebServerRequest *req) {
     DeviceState localState;
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(100))) {
@@ -63,6 +66,10 @@ void webTask(void *pvParameters) {
     }
 
     String json = "{";
+    json += "\"mode\":\"" +
+            String(localState.currentMode == MODE_LEVEL ? "level"
+                                                        : "timeBased") +
+            "\",";
     json += "\"worst\":\"" + String(localState.worstPollutant) + "\",";
     json += "\"aqi\":" + String(localState.customAQIFloat, 2) + ",";
     json += "\"pm1\":" + String(localState.pm1, 2) + ",";
@@ -81,11 +88,74 @@ void webTask(void *pvParameters) {
         "\"isWarmingUp\":" + String(localState.isWarmingUp ? "true" : "false") +
         ",";
     json += "\"warmupTime\":" + String(localState.warmupSeconds);
+
+    // Exposure fields — only included when in time-based mode
+    if (localState.currentMode == MODE_TIME_BASED) {
+      json += ",\"timeRemaining\":" +
+              String(localState.timeRemainingMinutes, 1);
+      json += ",\"exposurePercent\":" +
+              String(localState.exposurePercent, 1);
+      json += ",\"limitingPollutant\":\"" +
+              String(localState.limitingPollutant) + "\"";
+      json += ",\"sessionSeconds\":" +
+              String(localState.totalExposureSeconds);
+    }
+
     json += "}";
 
     req->send(200, "application/json", json);
   });
 
+  // =========================================================================
+  // /api/mode — Switch operating mode
+  // =========================================================================
+  server.on("/api/mode", HTTP_POST, [](AsyncWebServerRequest *req) {
+    if (!req->hasParam("mode")) {
+      req->send(400, "text/plain", "Missing 'mode' parameter");
+      return;
+    }
+
+    String modeStr = req->getParam("mode")->value();
+
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(100))) {
+      if (modeStr == "level") {
+        state.currentMode = MODE_LEVEL;
+        state.exposureActive = false;
+        Serial.println("[WebTask] Mode switched to: LEVEL");
+      } else if (modeStr == "timeBased") {
+        state.currentMode = MODE_TIME_BASED;
+        // exposureTask will detect the mode change and reset accumulators
+        state.exposureActive = false;
+        Serial.println("[WebTask] Mode switched to: TIME-BASED");
+      } else {
+        xSemaphoreGive(stateMutex);
+        req->send(400, "text/plain", "Invalid mode. Use 'level' or 'timeBased'");
+        return;
+      }
+      xSemaphoreGive(stateMutex);
+      req->send(200, "text/plain", "Mode updated");
+    } else {
+      req->send(500, "text/plain", "Mutex busy");
+    }
+  });
+
+  // =========================================================================
+  // /api/reset-exposure — Reset exposure session
+  // =========================================================================
+  server.on("/api/reset-exposure", HTTP_POST, [](AsyncWebServerRequest *req) {
+    if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(100))) {
+      state.exposureResetRequested = true;
+      xSemaphoreGive(stateMutex);
+      Serial.println("[WebTask] Exposure reset requested from dashboard.");
+      req->send(200, "text/plain", "Exposure session reset");
+    } else {
+      req->send(500, "text/plain", "Mutex busy");
+    }
+  });
+
+  // =========================================================================
+  // /config — Debug override (unchanged)
+  // =========================================================================
   server.on("/config", HTTP_POST, [](AsyncWebServerRequest *req) {
     bool nextOverride = false;
     float nextAqi = 1.0f;
@@ -107,6 +177,9 @@ void webTask(void *pvParameters) {
     }
   });
 
+  // =========================================================================
+  // /api/set-time — Time sync (unchanged)
+  // =========================================================================
   server.on("/api/set-time", HTTP_POST, [](AsyncWebServerRequest *req) {
     if (req->hasParam("epoch")) {
       unsigned long phoneTime = req->getParam("epoch")->value().toInt();
@@ -127,6 +200,9 @@ void webTask(void *pvParameters) {
     }
   });
 
+  // =========================================================================
+  // /history — History data (unchanged)
+  // =========================================================================
   server.on("/history", HTTP_GET, [](AsyncWebServerRequest *req) {
     String json = "[";
 

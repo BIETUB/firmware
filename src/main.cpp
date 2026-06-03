@@ -1,5 +1,6 @@
 #include "actuatorTasks.h"
 #include "aqiEngineTask.h"
+#include "exposureTask.h"
 #include "loggerTask.h"
 #include "monitorTask.h"
 #include "sensorTask.h"
@@ -22,13 +23,14 @@ void setup() {
   stateMutex = xSemaphoreCreateMutex();
 
   xTaskCreate(sensorTask, "SensorTask", 4096, NULL, 1, NULL);
-  xTaskCreate(monitorTask, "MonitorTask", 2048, NULL, 1, NULL);
+  xTaskCreate(monitorTask, "MonitorTask", 3072, NULL, 1, NULL);
   xTaskCreate(webTask, "webTask", 4096, NULL, 1, NULL);
   xTaskCreate(aqiEngineTask, "AqiEngine", 3072, NULL, 1, NULL);
-  xTaskCreate(ledTask, "LEDTask", 2048, NULL, 1, NULL);
-  xTaskCreate(motorTask, "MotorTask", 2048, NULL, 1, NULL);
+  xTaskCreate(exposureTask, "ExposureTask", 4096, NULL, 1, NULL);
+  xTaskCreate(ledTask, "LEDTask", 3072, NULL, 1, NULL);
+  xTaskCreate(servoTask, "ServoTask", 3072, NULL, 1, NULL);
   xTaskCreate(diffuserTask, "DiffuserTask", 2048, NULL, 1, NULL);
-  xTaskCreate(loggerTask, "LoggerTask", 2048, NULL, 1, NULL);
+  xTaskCreate(loggerTask, "LoggerTask", 3072, NULL, 1, NULL);
 
   Serial.println("Tasks launched successfully!");
 }

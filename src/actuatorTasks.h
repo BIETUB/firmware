@@ -1,5 +1,4 @@
 #pragma once
-
 void ledTask(void *pvParameters);
-void motorTask(void *pvParameters);
+void servoTask(void *pvParameters);
 void diffuserTask(void *pvParameters);

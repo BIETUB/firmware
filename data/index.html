@@ -23,13 +23,149 @@
         }
 
         .status-indicator {
-            margin-bottom: 2rem;
+            margin-bottom: 1.5rem;
             color: #94a3b8;
             font-size: 0.95rem;
             display: flex;
             align-items: center;
         }
 
+        /* ========== MODE TOGGLE ========== */
+        .mode-toggle-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            background: rgba(30, 41, 59, 0.7);
+            border-radius: 16px;
+            padding: 1rem 1.5rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        }
+
+        .mode-label {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .mode-label.active {
+            color: #38bdf8;
+            font-weight: bold;
+        }
+
+        .mode-switch {
+            position: relative;
+            display: inline-block;
+            width: 56px;
+            height: 28px;
+        }
+
+        .mode-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .mode-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: linear-gradient(135deg, #22c55e, #10b981);
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .mode-slider:before {
+            position: absolute;
+            content: "";
+            height: 20px;
+            width: 20px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .mode-slider {
+            background: linear-gradient(135deg, #8b5cf6, #6d28d9);
+        }
+
+        input:checked + .mode-slider:before {
+            transform: translateX(28px);
+        }
+
+        /* ========== EXPOSURE HERO CARD ========== */
+        .exposure-hero {
+            display: none;
+            width: 100%;
+            max-width: 800px;
+            box-sizing: border-box;
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+
+        .time-remaining {
+            font-size: 3.5rem;
+            font-weight: bold;
+            margin: 1rem 0 0.5rem 0;
+            line-height: 1.1;
+        }
+
+        .time-remaining.safe { color: #22c55e; }
+        .time-remaining.caution { color: #eab308; }
+        .time-remaining.warning { color: #f97316; }
+        .time-remaining.danger { color: #ef4444; }
+
+        .exposure-bar-container {
+            width: 100%;
+            height: 28px;
+            background: rgba(15, 23, 42, 0.8);
+            border-radius: 14px;
+            overflow: hidden;
+            margin-top: 1rem;
+        }
+
+        .exposure-bar {
+            height: 100%;
+            width: 0%;
+            border-radius: 14px;
+            transition: width 0.8s ease, background 0.5s ease;
+        }
+
+        .exposure-bar.safe { background: linear-gradient(90deg, #22c55e, #4ade80); }
+        .exposure-bar.caution { background: linear-gradient(90deg, #eab308, #facc15); }
+        .exposure-bar.warning { background: linear-gradient(90deg, #f97316, #fb923c); }
+        .exposure-bar.danger { background: linear-gradient(90deg, #ef4444, #f87171); }
+
+        .exposure-meta {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 0.75rem;
+            color: #94a3b8;
+            font-size: 0.9rem;
+        }
+
+        .reset-btn {
+            margin-top: 1rem;
+            padding: 0.6rem 1.5rem;
+            background: rgba(239, 68, 68, 0.15);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #f87171;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            transition: all 0.2s;
+        }
+
+        .reset-btn:hover {
+            background: rgba(239, 68, 68, 0.3);
+            border-color: rgba(239, 68, 68, 0.5);
+        }
+
+        /* ========== EXISTING STYLES ========== */
         .grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
@@ -106,40 +242,16 @@
         }
 
         @keyframes pulse {
-
-            0%,
-            100% {
-                opacity: 1
-            }
-
-            50% {
-                opacity: 0.3
-            }
+            0%, 100% { opacity: 1 }
+            50% { opacity: 0.3 }
         }
 
-        .c-pm {
-            color: #f43f5e;
-        }
-
-        .c-temp {
-            color: #f97316;
-        }
-
-        .c-hum {
-            color: #0ea5e9;
-        }
-
-        .c-voc {
-            color: #8b5cf6;
-        }
-
-        .c-nox {
-            color: #d946ef;
-        }
-
-        .c-co2 {
-            color: #10b981;
-        }
+        .c-pm { color: #f43f5e; }
+        .c-temp { color: #f97316; }
+        .c-hum { color: #0ea5e9; }
+        .c-voc { color: #8b5cf6; }
+        .c-nox { color: #d946ef; }
+        .c-co2 { color: #10b981; }
 
         .debug-panel {
             background: rgba(51, 65, 85, 0.5);
@@ -208,10 +320,7 @@
         .slider-toggle {
             position: absolute;
             cursor: pointer;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
+            top: 0; left: 0; right: 0; bottom: 0;
             background-color: #475569;
             transition: .3s;
             border-radius: 34px;
@@ -266,6 +375,11 @@
             color: #94a3b8;
             font-size: 0.95rem;
         }
+
+        /* Level-only elements hidden in time-based mode */
+        .level-only { display: block; }
+        body.time-based-mode .level-only { display: none; }
+        body.time-based-mode .exposure-hero { display: block; }
     </style>
 </head>
 
@@ -273,6 +387,17 @@
     <h1>Air Quality Dashboard</h1>
     <div class="status-indicator"><span class="dot"></span>Live System Monitoring</div>
 
+    <!-- ========== MODE TOGGLE ========== -->
+    <div class="mode-toggle-container">
+        <span class="mode-label" id="labelLevel">Level Mode</span>
+        <label class="mode-switch">
+            <input type="checkbox" id="modeToggle" onchange="switchMode()">
+            <span class="mode-slider"></span>
+        </label>
+        <span class="mode-label" id="labelTimeBased">Monitoring Mode</span>
+    </div>
+
+    <!-- ========== WARMUP CARD ========== -->
     <div id="warmupCard" class="card warmup-card">
         <div class="label" style="color:#38bdf8;">Sensor Stabilization Period</div>
         <div class="progress-container">
@@ -283,8 +408,26 @@
         </div>
     </div>
 
+    <!-- ========== EXPOSURE HERO (Time-Based Mode) ========== -->
+    <div id="exposureHero" class="card exposure-hero">
+        <div class="label" style="color:#8b5cf6;">Exposure Monitoring Session</div>
+        <div class="time-remaining safe" id="timeRemaining">--:--</div>
+        <div class="unit">time remaining</div>
+        <div class="exposure-bar-container">
+            <div id="exposureBar" class="exposure-bar safe"></div>
+        </div>
+        <div class="exposure-meta">
+            <span>Limiting: <strong id="limitingPollutant">--</strong></span>
+            <span>Exposure: <strong id="exposurePctDisplay">0%</strong></span>
+            <span>Session: <strong id="sessionTime">0:00</strong></span>
+        </div>
+        <button class="reset-btn" onclick="resetExposure()">🔄 Reset Session</button>
+    </div>
+
+    <!-- ========== SENSOR GRID (always visible) ========== -->
     <div class="grid">
-        <div class="card">
+        <!-- AQI card only in level mode -->
+        <div class="card level-only" id="aqiCard">
             <div class="label">AQI (Calculated)</div>
             <div class="value c-pm" id="aqi">--</div>
             <div class="unit">Driving Vector: <span id="worst" style="color:#e2e8f0;">--</span></div>
@@ -336,13 +479,15 @@
         </div>
     </div>
 
-    <div class="card chart-card">
+    <!-- ========== HISTORY CHART (level mode only) ========== -->
+    <div class="card chart-card level-only">
         <div class="label">AQI Exposure Timeline (RAM Buffer)</div>
         <div class="canvas-container">
             <canvas id="historyChart"></canvas>
         </div>
     </div>
 
+    <!-- ========== DEBUG PANEL ========== -->
     <div class="debug-panel">
         <div class="debug-title">🛠️ Actuator Tester (Debug Override)</div>
         <div class="debug-row">
@@ -362,7 +507,8 @@
 
     <script>
         let isUserInteracting = false;
-        const TOTAL_WARMUP_TIME = 120; // Matches your 2-minute metric constraint
+        let currentMode = 'level';
+        const TOTAL_WARMUP_TIME = 120;
 
         function updateSliderLabel(val) {
             document.getElementById('sliderValDisplay').textContent = parseFloat(val).toFixed(1);
@@ -370,12 +516,89 @@
         }
 
         // =========================================================================
-        // SILENT TIMESTAMP INJECTION (Option 1 Execution)
+        // MODE SWITCHING
+        // =========================================================================
+        async function switchMode() {
+            const isTimeBased = document.getElementById('modeToggle').checked;
+            const newMode = isTimeBased ? 'timeBased' : 'level';
+
+            try {
+                await fetch(`/api/mode?mode=${newMode}`, { method: 'POST' });
+                console.log(`Mode switched to: ${newMode}`);
+            } catch (e) {
+                console.error('Mode switch failed:', e);
+            }
+        }
+
+        function applyModeUI(mode) {
+            currentMode = mode;
+            const body = document.body;
+            const toggle = document.getElementById('modeToggle');
+            const labelLevel = document.getElementById('labelLevel');
+            const labelTimeBased = document.getElementById('labelTimeBased');
+
+            if (mode === 'timeBased') {
+                body.classList.add('time-based-mode');
+                toggle.checked = true;
+                labelLevel.classList.remove('active');
+                labelTimeBased.classList.add('active');
+            } else {
+                body.classList.remove('time-based-mode');
+                toggle.checked = false;
+                labelLevel.classList.add('active');
+                labelTimeBased.classList.remove('active');
+            }
+        }
+
+        // =========================================================================
+        // EXPOSURE RESET
+        // =========================================================================
+        async function resetExposure() {
+            try {
+                await fetch('/api/reset-exposure', { method: 'POST' });
+                console.log('Exposure session reset.');
+            } catch (e) {
+                console.error('Reset failed:', e);
+            }
+        }
+
+        // =========================================================================
+        // FORMAT TIME HELPER
+        // =========================================================================
+        function formatMinutes(mins) {
+            if (mins >= 999) return '∞';
+            if (mins <= 0) return '0:00';
+
+            const hours = Math.floor(mins / 60);
+            const minutes = Math.floor(mins % 60);
+
+            if (hours > 0) {
+                return `${hours}h ${minutes}m`;
+            }
+            return `${minutes}m`;
+        }
+
+        function formatSessionTime(seconds) {
+            const h = Math.floor(seconds / 3600);
+            const m = Math.floor((seconds % 3600) / 60);
+            const s = seconds % 60;
+            if (h > 0) return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+            return `${m}:${String(s).padStart(2, '0')}`;
+        }
+
+        function getExposureClass(pct) {
+            if (pct >= 90) return 'danger';
+            if (pct >= 75) return 'warning';
+            if (pct >= 50) return 'caution';
+            return 'safe';
+        }
+
+        // =========================================================================
+        // SILENT TIMESTAMP INJECTION
         // =========================================================================
         async function syncTime() {
             try {
                 const epochSeconds = Math.floor(Date.now() / 1000);
-                // POST request safely routes parameters matching webTask signature
                 await fetch(`/api/set-time?epoch=${epochSeconds}`, { method: 'POST' });
                 console.log("Real-world clock reference injected successfully.");
             } catch (e) {
@@ -403,6 +626,9 @@
                 const r = await fetch('/data');
                 const d = await r.json();
 
+                // Apply mode from server state
+                applyModeUI(d.mode);
+
                 const warmupCard = document.getElementById('warmupCard');
                 const warmupBar = document.getElementById('warmupBar');
                 const warmupPercent = document.getElementById('warmupPercent');
@@ -415,6 +641,27 @@
                     warmupPercent.textContent = cleanPct + '%';
                 } else {
                     warmupCard.style.display = 'none';
+                }
+
+                // --- Update exposure hero if in time-based mode ---
+                if (d.mode === 'timeBased' && d.timeRemaining !== undefined) {
+                    const tr = document.getElementById('timeRemaining');
+                    const eb = document.getElementById('exposureBar');
+                    const ep = document.getElementById('exposurePctDisplay');
+                    const lp = document.getElementById('limitingPollutant');
+                    const st = document.getElementById('sessionTime');
+
+                    const cls = getExposureClass(d.exposurePercent);
+
+                    tr.textContent = formatMinutes(d.timeRemaining);
+                    tr.className = 'time-remaining ' + cls;
+
+                    eb.style.width = Math.min(100, d.exposurePercent) + '%';
+                    eb.className = 'exposure-bar ' + cls;
+
+                    ep.textContent = d.exposurePercent.toFixed(1) + '%';
+                    lp.textContent = d.limitingPollutant || '--';
+                    st.textContent = formatSessionTime(d.sessionSeconds || 0);
                 }
 
                 const updateVal = (id, val, isIndex) => {
@@ -452,6 +699,9 @@
         // NATIVE VANILLA GRAPH ENGINE (Offline Safe)
         // =========================================================================
         async function fetchAndDrawHistory() {
+            // Skip chart updates in time-based mode
+            if (currentMode === 'timeBased') return;
+
             try {
                 const r = await fetch('/history');
                 const data = await r.json();
@@ -540,16 +790,13 @@
                 ctx.textAlign = 'center';
 
                 if (data.length > 0) {
-                    // Check if time has been synced (Uptime references look like small numbers, epochs look like >10000000)
                     const formatTime = (ts) => {
-                        if (ts < 10000000) return ts + 's'; // Displays simple uptime trace
+                        if (ts < 10000000) return ts + 's';
                         const date = new Date(ts * 1000);
                         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
                     };
 
-                    // Leftmost mark
                     ctx.fillText(formatTime(data[0].t), paddingLeft, height - paddingBottom + 18);
-                    // Rightmost mark
                     if (data.length > 1) {
                         ctx.fillText(formatTime(data[data.length - 1].t), width - paddingRight, height - paddingBottom + 18);
                     }

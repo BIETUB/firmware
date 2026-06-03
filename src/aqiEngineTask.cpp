@@ -118,59 +118,59 @@ void aqiEngineTask(void *pvParameters) {
       continue;
     }
 
+    // Time-based mode is handled entirely by exposureTask — skip AQI
+    if (localState.currentMode == MODE_TIME_BASED) {
+      vTaskDelay(pdMS_TO_TICKS(1000));
+      continue;
+    }
+
     float finalAQIFloat = 1.0f;
     int finalAQI = 1;
     const char *worstPollutant = "None";
 
-    if (localState.currentMode == MODE_LEVEL) {
+    PollutantDefinition pollutants[] = {
+        {"PM1", PM1_CURVE, sizeof(PM1_CURVE) / sizeof(AQIPoint),
+         localState.pm1},
 
-      PollutantDefinition pollutants[] = {
-          {"PM1", PM1_CURVE, sizeof(PM1_CURVE) / sizeof(AQIPoint),
-           localState.pm1},
+        {"PM2.5", PM25_CURVE, sizeof(PM25_CURVE) / sizeof(AQIPoint),
+         localState.pm2_5},
 
-          {"PM2.5", PM25_CURVE, sizeof(PM25_CURVE) / sizeof(AQIPoint),
-           localState.pm2_5},
+        {"PM4", PM4_CURVE, sizeof(PM4_CURVE) / sizeof(AQIPoint),
+         localState.pm4},
 
-          {"PM4", PM4_CURVE, sizeof(PM4_CURVE) / sizeof(AQIPoint),
-           localState.pm4},
+        {"PM10", PM10_CURVE, sizeof(PM10_CURVE) / sizeof(AQIPoint),
+         localState.pm10},
 
-          {"PM10", PM10_CURVE, sizeof(PM10_CURVE) / sizeof(AQIPoint),
-           localState.pm10},
+        {"CO2", CO2_CURVE, sizeof(CO2_CURVE) / sizeof(AQIPoint),
+         static_cast<float>(localState.co2)},
 
-          {"CO2", CO2_CURVE, sizeof(CO2_CURVE) / sizeof(AQIPoint),
-           static_cast<float>(localState.co2)},
+        {"VOC", VOC_CURVE, sizeof(VOC_CURVE) / sizeof(AQIPoint),
+         localState.voc_indx},
 
-          {"VOC", VOC_CURVE, sizeof(VOC_CURVE) / sizeof(AQIPoint),
-           localState.voc_indx},
+        {"NOx", NOX_CURVE, sizeof(NOX_CURVE) / sizeof(AQIPoint),
+         localState.nox_indx},
 
-          {"NOx", NOX_CURVE, sizeof(NOX_CURVE) / sizeof(AQIPoint),
-           localState.nox_indx},
+        {"Humidity", HUMIDITY_CURVE,
+         sizeof(HUMIDITY_CURVE) / sizeof(AQIPoint), localState.humidity},
 
-          {"Humidity", HUMIDITY_CURVE,
-           sizeof(HUMIDITY_CURVE) / sizeof(AQIPoint), localState.humidity},
+        {"Temperature", TEMP_CURVE, sizeof(TEMP_CURVE) / sizeof(AQIPoint),
+         localState.temperature}};
 
-          {"Temperature", TEMP_CURVE, sizeof(TEMP_CURVE) / sizeof(AQIPoint),
-           localState.temperature}};
+    const size_t pollutantCount =
+        sizeof(pollutants) / sizeof(PollutantDefinition);
 
-      const size_t pollutantCount =
-          sizeof(pollutants) / sizeof(PollutantDefinition);
+    for (size_t i = 0; i < pollutantCount; i++) {
+      float score = calculateIndex(pollutants[i].value, pollutants[i].curve,
+                                   pollutants[i].curveSize);
 
-      for (size_t i = 0; i < pollutantCount; i++) {
-        float score = calculateIndex(pollutants[i].value, pollutants[i].curve,
-                                     pollutants[i].curveSize);
-
-        if (score > finalAQIFloat) {
-          finalAQIFloat = score;
-          worstPollutant = pollutants[i].name;
-        }
+      if (score > finalAQIFloat) {
+        finalAQIFloat = score;
+        worstPollutant = pollutants[i].name;
       }
-
-      finalAQI = round(finalAQIFloat);
-      finalAQI = constrain(finalAQI, 1, 10);
-
-    } else if (localState.currentMode == MODE_TIME_BASED) {
-      // Future implementation
     }
+
+    finalAQI = round(finalAQIFloat);
+    finalAQI = constrain(finalAQI, 1, 10);
 
     if (xSemaphoreTake(stateMutex, pdMS_TO_TICKS(100))) {
       state.customAQIFloat = finalAQIFloat;
