@@ -206,22 +206,29 @@ void diffuserTask(void *pvParameters) {
       }
       break;
 
-    case STATE_RUNNING:
-      if ((now - stateTimestamp) % 2000 < 100) {
+    case STATE_RUNNING: {
+      unsigned long elapsed = now - stateTimestamp;
+
+      // Only print every ~2 seconds
+      if (elapsed % 2000 < 100) {
+        // Calculate remaining time safely using signed longs
+        long remaining = (long)DIFFUSER_DURATION - (long)elapsed;
+        if (remaining < 0)
+          remaining = 0; // Clamp to zero if it slightly overshoots
+
         Serial.printf(
-            "[Diffuser Task] Diffuser running... Time remaining: %lu ms\n",
-            DIFFUSER_DURATION - (now - stateTimestamp));
+            "[Diffuser Task] Diffuser running... Time remaining: %ld ms\n",
+            remaining);
       }
 
-      if (now - stateTimestamp >= DIFFUSER_DURATION) {
+      if (elapsed >= DIFFUSER_DURATION) {
         Serial.println(
             "[Diffuser Task] Runtime expired! Starting 3s OFF Pulse...");
-
         digitalWrite(DIFFUSER_PIN, LOW);
         stateTimestamp = now;
         currentState = STATE_PULSE_OFF;
       }
-      break;
+    } break;
 
     case STATE_PULSE_OFF:
       if (now - stateTimestamp >= OFF_PULSE_TIME) {

@@ -12,6 +12,24 @@ void sensorTask(void *pvParameters) {
 
   vTaskDelay(pdMS_TO_TICKS(100));
 
+  int16_t tuningError = sen66.setVocAlgorithmTuningParameters(
+      100, // vocIndexOffset (Default: 100)
+      720, // learningTimeOffsetHours (Default: 12)
+      12,  // learningTimeGainHours (Default: 12)
+      180, // gatingMaxDurationMinutes (Default: 180)
+      50,  // stdInitial (Default: 50)
+      230  // gainFactor (Default: 230)
+  );
+
+  if (tuningError != 0) {
+    Serial.printf(
+        "[SensorTask] Warning: Failed to apply VOC tuning parameters: %d\n",
+        tuningError);
+  } else {
+    Serial.println("[SensorTask] VOC Algorithm successfully optimized for "
+                   "24-hour baseline stability.");
+  }
+
   sen66.startContinuousMeasurement();
   Serial.println("[SensorTask] SEN66 started continuous measurement.");
   vTaskDelay(pdMS_TO_TICKS(1000));
