@@ -18,25 +18,13 @@ struct PollutantDefinition {
   float value;
 };
 
-const AQIPoint PM1_CURVE[] = {{0, 1}, {10, 3}, {25, 6}, {75, 10}};
-
-const AQIPoint PM25_CURVE[] = {{0, 1}, {15, 3}, {35, 6}, {100, 10}};
-
-const AQIPoint PM4_CURVE[] = {{0, 1}, {20, 3}, {50, 6}, {150, 10}};
-
-const AQIPoint PM10_CURVE[] = {{0, 1}, {30, 3}, {75, 6}, {200, 10}};
-
-const AQIPoint CO2_CURVE[] = {{400, 1}, {800, 3}, {1000, 5}, {5000, 10}};
-
-const AQIPoint VOC_CURVE[] = {{0, 1}, {100, 2}, {150, 4}, {250, 7}, {500, 10}};
-
-const AQIPoint NOX_CURVE[] = {{0, 1}, {50, 3}, {150, 6}, {300, 10}};
-
-const AQIPoint HUMIDITY_CURVE[] = {{0, 10}, {20, 6}, {40, 1},
-                                   {60, 1}, {80, 6}, {100, 10}};
-
-const AQIPoint TEMP_CURVE[] = {{0, 10}, {15, 3}, {21, 1},
-                               {24, 1}, {30, 5}, {40, 10}};
+const AQIPoint PM1_CURVE[] = {{1, 1}, {6, 2}, {10, 3}, {15, 4}, {20, 5}, {25, 6}, {30, 7}, {35, 8}, {55, 9}, {75, 10}};
+const AQIPoint PM25_CURVE[] = {{1, 1}, {8, 2}, {12, 3}, {20, 4}, {27, 5}, {35, 6}, {42, 7}, {50, 8}, {75, 9}, {100, 10}};
+const AQIPoint PM4_CURVE[] = {{15, 1}, {20, 2}, {35, 3}, {40, 4}, {45, 5}, {50, 6}, {55, 7}, {60, 8}, {85, 9}, {115, 10}};
+const AQIPoint PM10_CURVE[] = {{15, 1}, {30, 2}, {45, 3}, {55, 4}, {63, 5}, {70, 6}, {80, 7}, {90, 8}, {115, 9}, {150, 10}};
+const AQIPoint CO2_CURVE[] = {{300, 1}, {400, 2}, {800, 3}, {950, 4}, {1000, 5}, {1500, 6}, {2000, 7}, {3000, 8}, {4000, 9}, {5000, 10}};
+const AQIPoint VOC_CURVE[] = {{50, 1}, {100, 2}, {125, 3}, {150, 4}, {175, 5}, {225, 6}, {250, 7}, {300, 8}, {400, 9}, {500, 10}};
+const AQIPoint NOX_CURVE[] = {{0, 1}, {1, 2}, {10, 3}, {20, 4}, {50, 5}, {75, 6}, {100, 7}, {250, 8}, {350, 9}, {500, 10}};
 
 float mapFloat(float x, float inMin, float inMax, float outMin, float outMax) {
   if (inMin == inMax)
@@ -148,13 +136,7 @@ void aqiEngineTask(void *pvParameters) {
          localState.voc_indx},
 
         {"NOx", NOX_CURVE, sizeof(NOX_CURVE) / sizeof(AQIPoint),
-         localState.nox_indx},
-
-        {"Humidity", HUMIDITY_CURVE,
-         sizeof(HUMIDITY_CURVE) / sizeof(AQIPoint), localState.humidity},
-
-        {"Temperature", TEMP_CURVE, sizeof(TEMP_CURVE) / sizeof(AQIPoint),
-         localState.temperature}};
+         localState.nox_indx}};
 
     const size_t pollutantCount =
         sizeof(pollutants) / sizeof(PollutantDefinition);
