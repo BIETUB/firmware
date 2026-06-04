@@ -48,8 +48,8 @@ void webTask(void *pvParameters) {
 
   dnsServer.start(DNS_PORT, "*", WiFi.softAPIP());
 
-  if (MDNS.begin("beitub")) {
-    Serial.println("[WebTask] mDNS started: http://beitub.local");
+  if (MDNS.begin("bietub")) {
+    Serial.println("[WebTask] mDNS started: http://bietub.local");
   }
 
   // =========================================================================
@@ -66,10 +66,10 @@ void webTask(void *pvParameters) {
     }
 
     String json = "{";
-    json += "\"mode\":\"" +
-            String(localState.currentMode == MODE_LEVEL ? "level"
-                                                        : "timeBased") +
-            "\",";
+    json +=
+        "\"mode\":\"" +
+        String(localState.currentMode == MODE_LEVEL ? "level" : "timeBased") +
+        "\",";
     json += "\"worst\":\"" + String(localState.worstPollutant) + "\",";
     json += "\"aqi\":" + String(localState.customAQIFloat, 2) + ",";
     json += "\"pm1\":" + String(localState.pm1, 2) + ",";
@@ -91,14 +91,12 @@ void webTask(void *pvParameters) {
 
     // Exposure fields — only included when in time-based mode
     if (localState.currentMode == MODE_TIME_BASED) {
-      json += ",\"timeRemaining\":" +
-              String(localState.timeRemainingMinutes, 1);
-      json += ",\"exposurePercent\":" +
-              String(localState.exposurePercent, 1);
+      json +=
+          ",\"timeRemaining\":" + String(localState.timeRemainingMinutes, 1);
+      json += ",\"exposurePercent\":" + String(localState.exposurePercent, 1);
       json += ",\"limitingPollutant\":\"" +
               String(localState.limitingPollutant) + "\"";
-      json += ",\"sessionSeconds\":" +
-              String(localState.totalExposureSeconds);
+      json += ",\"sessionSeconds\":" + String(localState.totalExposureSeconds);
     }
 
     json += "}";
@@ -129,7 +127,8 @@ void webTask(void *pvParameters) {
         Serial.println("[WebTask] Mode switched to: TIME-BASED");
       } else {
         xSemaphoreGive(stateMutex);
-        req->send(400, "text/plain", "Invalid mode. Use 'level' or 'timeBased'");
+        req->send(400, "text/plain",
+                  "Invalid mode. Use 'level' or 'timeBased'");
         return;
       }
       xSemaphoreGive(stateMutex);
