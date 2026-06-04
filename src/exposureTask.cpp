@@ -4,29 +4,63 @@
 #include <cfloat>
 
 // =============================================================================
-// TWA DOSE LIMITS — Tweak these based on your research
+// TWA DOSE LIMITS (For Raw Physical Concentrations Only)
 // =============================================================================
 // Format: { "Name", dose ceiling in (unit·hours) }
-// Dose ceiling = recommended TWA concentration × 8-hour reference window.
-// e.g., PM2.5: 35 µg/m³ × 8hr = 280 µg·hr
-
+// VOC and NOx are removed from here and handled via the Harm Factor model.
 struct ExposureLimitDef {
   const char *name;
-  float doseCeiling; // unit·hours (µg·hr, ppm·hr, or index·hr)
+  float doseCeiling;
 };
 
 const ExposureLimitDef LIMITS[] = {
     {"PM1", 80.0f},    // 10 µg/m³ × 8hr
-    {"PM2.5", 280.0f}, // 35 µg/m³ × 8hr
-    {"PM4", 400.0f},   // 50 µg/m³ × 8hr
-    {"PM10", 1200.0f}, // 150 µg/m³ × 8hr
-    {"CO2", 40000.0f}, // 5000 ppm × 8hr
-    {"VOC", 2000.0f},  // 250 index × 8hr
-    {"NOx", 1200.0f},  // 150 index × 8hr
+    {"PM2.5", 120.0f}, // 15 µg/m³ × 8hr
+    {"PM4", 280.0f},   // 35 µg/m³ × 8hr
+    {"PM10", 360.0f},  // 45 µg/m³ × 8hr
+    {"CO2", 32000.0f}, // 4000 ppm × 8hr
 };
 
-const size_t NUM_POLLUTANTS = sizeof(LIMITS) / sizeof(ExposureLimitDef);
+const size_t NUM_RAW_POLLUTANTS = sizeof(LIMITS) / sizeof(ExposureLimitDef);
 
+// =============================================================================
+// HARM-FACTOR FUNCTIONS (VOC Index & NOx Index → Normalized dose rate)
+// =============================================================================
+// Both share the same ceiling: 8 harm·hours
+// (= 8 hours at harm factor 1.0, or 2 hours at harm factor 4.0, etc.)
+static constexpr float HARM_CEILING = 8.0f;
+
+static float piecewiseLerp(float x, const float xs[], const float ys[], int n) {
+  if (x <= xs[0])
+    return ys[0];
+  if (x >= xs[n - 1])
+    return ys[n - 1];
+  for (int i = 0; i < n - 1; i++) {
+    if (x >= xs[i] && x < xs[i + 1]) {
+      float t = (x - xs[i]) / (xs[i + 1] - xs[i]);
+      return ys[i] + t * (ys[i + 1] - ys[i]);
+    }
+  }
+  return ys[n - 1];
+}
+
+// VOC Index breakpoints
+float vocHarmFactor(float idx) {
+  static const float xs[] = {0, 100, 150, 200, 300, 400, 500};
+  static const float ys[] = {0.0, 0.0, 1.0, 4.0, 16.0, 32.0, 64.0};
+  return piecewiseLerp(idx, xs, ys, 7);
+}
+
+// NOx Index breakpoints
+float noxHarmFactor(float idx) {
+  static const float xs[] = {1, 20, 50, 100, 200, 300, 500};
+  static const float ys[] = {0.0, 0.0, 1.0, 4.0, 16.0, 32.0, 64.0};
+  return piecewiseLerp(idx, xs, ys, 7);
+}
+
+// =============================================================================
+// CORE TASK ARCHITECTURE
+// =============================================================================
 // Sampling interval for dose integration
 const unsigned long EXPOSURE_SAMPLE_MS = 10000;         // 10 seconds
 const float DT_HOURS = EXPOSURE_SAMPLE_MS / 3600000.0f; // 10s in hours
@@ -50,9 +84,9 @@ void resetDoseAccumulators(DeviceState &s) {
 }
 
 void exposureTask(void *pvParameters) {
-
   bool wasActive = false;
-  float sumPM1 = 0, sumPM25 = 0, sumPM4 = 0, sumPM10 = 0, sumCO2 = 0, sumVOC = 0, sumNOx = 0;
+  float sumPM1 = 0, sumPM25 = 0, sumPM4 = 0, sumPM10 = 0, sumCO2 = 0,
+        sumVOC = 0, sumNOx = 0;
   int sampleCount = 0;
 
   for (;;) {
@@ -82,7 +116,7 @@ void exposureTask(void *pvParameters) {
       xSemaphoreGive(stateMutex);
       sumPM1 = sumPM25 = sumPM4 = sumPM10 = sumCO2 = sumVOC = sumNOx = 0.0f;
       sampleCount = 0;
-      continue; // Skip this tick — start clean on the next one
+      continue;
     }
 
     localState = state;
@@ -111,57 +145,88 @@ void exposureTask(void *pvParameters) {
     float avgVOC = sumVOC / 10.0f;
     float avgNOx = sumNOx / 10.0f;
 
-    // Reset accumulators for the next 10-second period
     sumPM1 = sumPM25 = sumPM4 = sumPM10 = sumCO2 = sumVOC = sumNOx = 0.0f;
     sampleCount = 0;
 
     // =========================================================================
-    // DOSE ACCUMULATION: dose += concentration × dt
+    // DOSE ACCUMULATION (Linear for PM/CO2, Harm Factor for VOC/NOx)
     // =========================================================================
     localState.dosePM1 += avgPM1 * DT_HOURS;
     localState.dosePM25 += avgPM25 * DT_HOURS;
     localState.dosePM4 += avgPM4 * DT_HOURS;
     localState.dosePM10 += avgPM10 * DT_HOURS;
     localState.doseCO2 += avgCO2 * DT_HOURS;
-    localState.doseVOC += avgVOC * DT_HOURS;
-    localState.doseNOx += avgNOx * DT_HOURS;
+
+    // Calculate harm factors from the raw indices
+    float harmVOC = vocHarmFactor(avgVOC);
+    float harmNOx = noxHarmFactor(avgNOx);
+
+    // Accumulate unitless "harm hours"
+    localState.doseVOC += harmVOC * DT_HOURS;
+    localState.doseNOx += harmNOx * DT_HOURS;
 
     // =========================================================================
-    // TIME REMAINING CALCULATION
+    // TIME REMAINING & PERCENTAGE CALCULATION (SPLIT APPROACH)
     // =========================================================================
-    // For each pollutant: remaining_time = (ceiling - accumulated) /
-    // current_rate Overall time = minimum across all pollutants
-
-    float doses[] = {localState.dosePM1, localState.dosePM25,
-                     localState.dosePM4, localState.dosePM10,
-                     localState.doseCO2, localState.doseVOC,
-                     localState.doseNOx};
-
-    float concentrations[] = {avgPM1, avgPM25, avgPM4, avgPM10,
-                              avgCO2, avgVOC, avgNOx};
-
     float minTimeRemainingHours = FLT_MAX;
     float maxExposurePercent = 0.0f;
     const char *limiting = "None";
 
-    for (size_t i = 0; i < NUM_POLLUTANTS; i++) {
-      float remainingDose = LIMITS[i].doseCeiling - doses[i];
+    // --- PART 1: PM and CO2 (Raw Concentration Model) ---
+    struct RawPollutant {
+      float dose;
+      float concentration;
+      float ceiling;
+      const char *name;
+    };
+    RawPollutant rawPollutants[] = {
+        {localState.dosePM1, avgPM1, LIMITS[0].doseCeiling, LIMITS[0].name},
+        {localState.dosePM25, avgPM25, LIMITS[1].doseCeiling, LIMITS[1].name},
+        {localState.dosePM4, avgPM4, LIMITS[2].doseCeiling, LIMITS[2].name},
+        {localState.dosePM10, avgPM10, LIMITS[3].doseCeiling, LIMITS[3].name},
+        {localState.doseCO2, avgCO2, LIMITS[4].doseCeiling, LIMITS[4].name},
+    };
 
-      // Exposure percentage for this pollutant
-      float pct = (doses[i] / LIMITS[i].doseCeiling) * 100.0f;
-      if (pct > maxExposurePercent) {
+    for (auto &p : rawPollutants) {
+      float pct = (p.dose / p.ceiling) * 100.0f;
+      if (pct > maxExposurePercent)
         maxExposurePercent = pct;
+
+      if (p.concentration > 0.01f) {
+        float t = (p.ceiling - p.dose) / p.concentration;
+        if (t < 0.0f)
+          t = 0.0f;
+        if (t < minTimeRemainingHours) {
+          minTimeRemainingHours = t;
+          limiting = p.name;
+        }
       }
+    }
 
-      // Time remaining at current concentration
-      if (concentrations[i] > 0.01f) {
-        float timeHours = remainingDose / concentrations[i];
-        if (timeHours < 0.0f)
-          timeHours = 0.0f;
+    // --- PART 2: VOC and NOx (Harm-Factor Model) ---
+    struct IndexPollutant {
+      float dose;
+      float harmFactor;
+      const char *name;
+    };
+    IndexPollutant indexPollutants[] = {
+        {localState.doseVOC, harmVOC, "VOC"},
+        {localState.doseNOx, harmNOx, "NOx"},
+    };
 
-        if (timeHours < minTimeRemainingHours) {
-          minTimeRemainingHours = timeHours;
-          limiting = LIMITS[i].name;
+    for (auto &p : indexPollutants) {
+      // Compare against the strict 8.0 harm ceiling
+      float pct = (p.dose / HARM_CEILING) * 100.0f;
+      if (pct > maxExposurePercent)
+        maxExposurePercent = pct;
+
+      if (p.harmFactor > 0.01f) {
+        float t = (HARM_CEILING - p.dose) / p.harmFactor;
+        if (t < 0.0f)
+          t = 0.0f;
+        if (t < minTimeRemainingHours) {
+          minTimeRemainingHours = t;
+          limiting = p.name;
         }
       }
     }
@@ -205,7 +270,8 @@ void exposureTask(void *pvParameters) {
                   sessionSeconds, maxExposurePercent, timeRemainingMin,
                   limiting);
 
-    Serial.printf("[Exposure]   Doses -> PM1:%.2f PM2.5:%.2f PM4:%.2f "
+    // Note: VOC and NOx doses are now in "harm·hours", not raw index·hours!
+    Serial.printf("[Exposure] Doses -> PM1:%.2f PM2.5:%.2f PM4:%.2f "
                   "PM10:%.2f CO2:%.2f VOC:%.2f NOx:%.2f\n",
                   localState.dosePM1, localState.dosePM25, localState.dosePM4,
                   localState.dosePM10, localState.doseCO2, localState.doseVOC,
