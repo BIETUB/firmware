@@ -16,19 +16,19 @@ struct ExposureLimitDef {
 };
 
 const ExposureLimitDef LIMITS[] = {
-    {"PM1", 80.0f},     // 10 µg/m³ × 8hr
-    {"PM2.5", 280.0f},  // 35 µg/m³ × 8hr
-    {"PM4", 400.0f},    // 50 µg/m³ × 8hr
-    {"PM10", 1200.0f},  // 150 µg/m³ × 8hr
-    {"CO2", 40000.0f},  // 5000 ppm × 8hr
-    {"VOC", 2000.0f},   // 250 index × 8hr
-    {"NOx", 1200.0f},   // 150 index × 8hr
+    {"PM1", 80.0f},    // 10 µg/m³ × 8hr
+    {"PM2.5", 280.0f}, // 35 µg/m³ × 8hr
+    {"PM4", 400.0f},   // 50 µg/m³ × 8hr
+    {"PM10", 1200.0f}, // 150 µg/m³ × 8hr
+    {"CO2", 40000.0f}, // 5000 ppm × 8hr
+    {"VOC", 2000.0f},  // 250 index × 8hr
+    {"NOx", 1200.0f},  // 150 index × 8hr
 };
 
 const size_t NUM_POLLUTANTS = sizeof(LIMITS) / sizeof(ExposureLimitDef);
 
 // Sampling interval for dose integration
-const unsigned long EXPOSURE_SAMPLE_MS = 10000; // 10 seconds
+const unsigned long EXPOSURE_SAMPLE_MS = 10000;         // 10 seconds
 const float DT_HOURS = EXPOSURE_SAMPLE_MS / 3600000.0f; // 10s in hours
 
 void resetDoseAccumulators(DeviceState &s) {
@@ -52,9 +52,11 @@ void resetDoseAccumulators(DeviceState &s) {
 void exposureTask(void *pvParameters) {
 
   bool wasActive = false;
+  float sumPM1 = 0, sumPM25 = 0, sumPM4 = 0, sumPM10 = 0, sumCO2 = 0, sumVOC = 0, sumNOx = 0;
+  int sampleCount = 0;
 
   for (;;) {
-    vTaskDelay(pdMS_TO_TICKS(EXPOSURE_SAMPLE_MS));
+    vTaskDelay(pdMS_TO_TICKS(1000)); // Sample every 1 second
 
     DeviceState localState;
 
@@ -66,6 +68,8 @@ void exposureTask(void *pvParameters) {
     if (state.currentMode != MODE_TIME_BASED || state.isWarmingUp) {
       wasActive = false;
       xSemaphoreGive(stateMutex);
+      sumPM1 = sumPM25 = sumPM4 = sumPM10 = sumCO2 = sumVOC = sumNOx = 0.0f;
+      sampleCount = 0;
       continue;
     }
 
@@ -76,38 +80,65 @@ void exposureTask(void *pvParameters) {
       state.exposureResetRequested = false;
       wasActive = true;
       xSemaphoreGive(stateMutex);
+      sumPM1 = sumPM25 = sumPM4 = sumPM10 = sumCO2 = sumVOC = sumNOx = 0.0f;
+      sampleCount = 0;
       continue; // Skip this tick — start clean on the next one
     }
 
     localState = state;
     xSemaphoreGive(stateMutex);
 
+    // Accumulate 1-second samples
+    sumPM1 += localState.pm1;
+    sumPM25 += localState.pm2_5;
+    sumPM4 += localState.pm4;
+    sumPM10 += localState.pm10;
+    sumCO2 += localState.co2;
+    sumVOC += localState.voc_indx;
+    sumNOx += localState.nox_indx;
+    sampleCount++;
+
+    // Only process dose and remaining time every 10 seconds
+    if (sampleCount < 10) {
+      continue;
+    }
+
+    float avgPM1 = sumPM1 / 10.0f;
+    float avgPM25 = sumPM25 / 10.0f;
+    float avgPM4 = sumPM4 / 10.0f;
+    float avgPM10 = sumPM10 / 10.0f;
+    float avgCO2 = sumCO2 / 10.0f;
+    float avgVOC = sumVOC / 10.0f;
+    float avgNOx = sumNOx / 10.0f;
+
+    // Reset accumulators for the next 10-second period
+    sumPM1 = sumPM25 = sumPM4 = sumPM10 = sumCO2 = sumVOC = sumNOx = 0.0f;
+    sampleCount = 0;
+
     // =========================================================================
     // DOSE ACCUMULATION: dose += concentration × dt
     // =========================================================================
-    localState.dosePM1 += localState.pm1 * DT_HOURS;
-    localState.dosePM25 += localState.pm2_5 * DT_HOURS;
-    localState.dosePM4 += localState.pm4 * DT_HOURS;
-    localState.dosePM10 += localState.pm10 * DT_HOURS;
-    localState.doseCO2 += localState.co2 * DT_HOURS;
-    localState.doseVOC += localState.voc_indx * DT_HOURS;
-    localState.doseNOx += localState.nox_indx * DT_HOURS;
+    localState.dosePM1 += avgPM1 * DT_HOURS;
+    localState.dosePM25 += avgPM25 * DT_HOURS;
+    localState.dosePM4 += avgPM4 * DT_HOURS;
+    localState.dosePM10 += avgPM10 * DT_HOURS;
+    localState.doseCO2 += avgCO2 * DT_HOURS;
+    localState.doseVOC += avgVOC * DT_HOURS;
+    localState.doseNOx += avgNOx * DT_HOURS;
 
     // =========================================================================
     // TIME REMAINING CALCULATION
     // =========================================================================
-    // For each pollutant: remaining_time = (ceiling - accumulated) / current_rate
-    // Overall time = minimum across all pollutants
+    // For each pollutant: remaining_time = (ceiling - accumulated) /
+    // current_rate Overall time = minimum across all pollutants
 
-    float doses[] = {localState.dosePM1,  localState.dosePM25,
-                     localState.dosePM4,  localState.dosePM10,
-                     localState.doseCO2,  localState.doseVOC,
+    float doses[] = {localState.dosePM1, localState.dosePM25,
+                     localState.dosePM4, localState.dosePM10,
+                     localState.doseCO2, localState.doseVOC,
                      localState.doseNOx};
 
-    float concentrations[] = {localState.pm1,      localState.pm2_5,
-                              localState.pm4,      localState.pm10,
-                              localState.co2,      localState.voc_indx,
-                              localState.nox_indx};
+    float concentrations[] = {avgPM1, avgPM25, avgPM4, avgPM10,
+                              avgCO2, avgVOC, avgNOx};
 
     float minTimeRemainingHours = FLT_MAX;
     float maxExposurePercent = 0.0f;
